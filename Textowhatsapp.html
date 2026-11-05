@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Chat Viewer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        wa: {
+                            green: '#00a884',
+                            darkGreen: '#111b21',
+                            teal: '#075e54',
+                            lightGreen: '#dcf8c6',
+                            bubbleOut: '#e7f8e8',
+                            darkBubbleIn: '#202c33',
+                            darkBubbleOut: '#005c4b',
+                            bgLight: '#efeae2',
+                            bgDark: '#0b141a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* WhatsApp background doodle effect */
+        .wa-bg-light {
+            background-color: #efeae2;
+            background-image: radial-gradient(#0000000d 1px, transparent 0);
+            background-size: 16px 16px;
+        }
+        .dark .wa-bg-dark {
+            background-color: #0b141a;
+            background-image: radial-gradient(#ffffff0a 1px, transparent 0);
+            background-size: 16px 16px;
+        }
+        
+        /* Message tail CSS tricks */
+        .bubble-in::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -8px;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 10px 10px 0;
+            border-color: transparent white transparent transparent;
+        }
+        .dark .bubble-in::before {
+            border-color: transparent #202c33 transparent transparent;
+        }
+
+        .bubble-out::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: -8px;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 0 10px 10px;
+            border-color: transparent transparent transparent #d9fdd3;
+        }
+        .dark .bubble-out::after {
+            border-color: transparent transparent transparent #005c4b;
+        }
+
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="h-full bg-slate-200 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans flex flex-col antialiased transition-colors duration-200">
+
+    <!-- Header Navigation -->
+    <header class="bg-[#008069] dark:bg-wa-darkGreen text-white px-3 sm:px-4 flex items-center justify-between shadow-sm z-30 shrink-0 h-14">
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <div class="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[#008069] dark:text-wa-green overflow-hidden shadow-inner font-bold text-sm shrink-0" id="chatAvatar">
+                <i data-lucide="users" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+                <h1 class="font-semibold text-sm sm:text-base leading-tight truncate max-w-[180px] sm:max-w-xs md:max-w-md" id="chatTitle">
+                    _chat
+                </h1>
+                <p class="text-[11px] text-emerald-100 dark:text-slate-400 truncate" id="chatSubtitle">
+                    227 messages • 4 participants
+                </p>
+            </div>
+        </div>
+
+        <!-- Header Actions -->
+        <div class="flex items-center space-x-1 sm:space-x-2">
+            <button id="toggleSearchBtn" title="Search messages" class="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition text-white">
+                <i data-lucide="search" class="w-4 h-4"></i>
+            </button>
+            <button id="toggleStatsBtn" title="Chat Statistics" class="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition text-white">
+                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+            </button>
+            <button id="toggleSettingsBtn" title="View Settings & Perspective" class="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition text-white">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+            </button>
+            <button id="toggleThemeBtn" title="Toggle dark/light mode" class="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition text-white">
+                <i data-lucide="moon" id="themeIcon" class="w-4 h-4"></i>
+            </button>
+            <label for="fileInputHeader" class="p-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full cursor-pointer transition shadow flex items-center justify-center ml-1" title="Upload new export file">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                <input type="file" id="fileInputHeader" accept=".txt" class="hidden">
+            </label>
+        </div>
+    </header>
+
+    <!-- Search Toolbar Overlay -->
+    <div id="searchBar" class="hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-1.5 flex items-center space-x-2 shadow-inner z-20 transition-all text-xs">
+        <i data-lucide="search" class="w-4 h-4 text-slate-400 shrink-0"></i>
+        <input type="text" id="searchInput" placeholder="Search message text or sender..." class="w-full bg-transparent text-xs focus:outline-none dark:text-white">
+        <select id="senderFilter" class="text-[11px] bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 max-w-[120px] truncate">
+            <option value="ALL">All Members</option>
+        </select>
+        <button id="closeSearchBtn" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+    </div>
+
+    <!-- Hidden Input for Replacing Omitted Media -->
+    <input type="file" id="mediaReplacerInput" accept="image/*" class="hidden">
+
+    <!-- Main Container -->
+    <main class="flex-1 relative overflow-hidden flex flex-col items-center justify-center bg-[#efeae2] dark:bg-slate-950 wa-bg-light dark:wa-bg-dark">
+
+        <!-- Initial Upload Screen -->
+        <div id="uploadScreen" class="hidden absolute inset-0 z-20 bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-4 text-center overflow-y-auto">
+            <div class="max-w-sm sm:max-w-md w-full bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 border border-slate-200 dark:border-slate-700">
+                <div class="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 text-[#008069] rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <i data-lucide="message-square" class="w-7 h-7"></i>
+                </div>
+                
+                <h2 class="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">WhatsApp Chat Viewer</h2>
+                <p class="text-slate-500 dark:text-slate-400 text-xs mb-4">
+                    Upload your exported WhatsApp chat text file (`.txt`) to view it in an authentic WhatsApp interface.
+                </p>
+
+                <!-- Dropzone -->
+                <div id="dropzone" class="border-2 border-dashed border-emerald-300 dark:border-emerald-700 hover:border-[#008069] bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl p-6 cursor-pointer transition flex flex-col items-center justify-center group mb-4">
+                    <i data-lucide="file-up" class="w-8 h-8 text-[#008069] group-hover:scale-110 transition-transform mb-2"></i>
+                    <p class="text-xs font-medium text-slate-700 dark:text-slate-300">
+                        Drag & Drop your <span class="font-mono text-emerald-600 dark:text-emerald-400">.txt</span> file here
+                    </p>
+                    <p class="text-[11px] text-slate-400 mt-1">or click to browse your files</p>
+                    <input type="file" id="fileInput" accept=".txt" class="hidden">
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-3">
+                    <span>Want to test first?</span>
+                    <button id="loadSampleBtn" class="text-[#008069] dark:text-emerald-400 hover:underline font-semibold flex items-center space-x-1">
+                        <span>Load Sample Demo Chat</span>
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div id="chatWindow" class="flex-1 w-full max-w-4xl wa-bg-light dark:wa-bg-dark overflow-y-auto px-3 sm:px-8 py-4 space-y-2 relative">
+            <!-- Messages rendered dynamically -->
+        </div>
+
+        <!-- Floating Scroll Buttons -->
+        <div id="scrollControls" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 flex flex-col space-y-1.5 z-20">
+            <button id="scrollTopBtn" title="Scroll to top" class="bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                <i data-lucide="arrow-up" class="w-4 h-4"></i>
+            </button>
+            <button id="scrollBottomBtn" title="Scroll to bottom" class="bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                <i data-lucide="arrow-down" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Modal: Settings & "Me" Selector -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <i data-lucide="user-check" class="w-5 h-5 text-[#008069]"></i>
+                    Display Settings
+                </h3>
+                <button id="closeSettingsBtn" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                        Select Perspective ("You")
+                    </label>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                        Choose which participant represents "You" to align outgoing bubbles to the right side with green background.
+                    </p>
+                    <select id="meSelect" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm text-slate-800 dark:text-slate-100 font-medium">
+                        <!-- Options generated dynamically -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button id="applySettingsBtn" class="bg-[#008069] hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm shadow transition">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Statistics -->
+    <div id="statsModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <i data-lucide="bar-chart-2" class="w-5 h-5 text-[#008069]"></i>
+                    Chat Overview
+                </h3>
+                <button id="closeStatsBtn" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="overflow-y-auto space-y-4 pr-1">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <span class="text-xs text-slate-400 uppercase font-semibold">Total Messages</span>
+                        <div class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1" id="statTotalMessages">0</div>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <span class="text-xs text-slate-400 uppercase font-semibold">Participants</span>
+                        <div class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1" id="statTotalParticipants">0</div>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Message Count by Member</h4>
+                    <div id="statParticipantsList" class="space-y-2">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // Store Application State
+        const state = {
+            rawText: '',
+            messages: [],
+            participants: new Set(),
+            participantColors: {},
+            currentUser: 'You',
+            searchTerm: '',
+            filterSender: 'ALL',
+            theme: 'light',
+            customMediaMap: {}, // Maps message index or filename to uploaded image DataURL
+            activeReplacingMsgId: null
+        };
+
+        const NAME_COLORS = [
+            '#e542a3', '#1f7aec', '#028a0f', '#8560a8', '#d02a2a', 
+            '#0097a7', '#b55e00', '#546e7a', '#7b1fa2', '#c2185b',
+            '#00796b', '#afb42b', '#e65100', '#6d4c41', '#512da8'
+        ];
+
+        const SAMPLE_CHAT = `[29/10/2026, 18:26:11] Shane: I think we are stuffed
+[29/10/2026, 18:26:20] Shane: We will be home before 8
+[29/10/2026, 18:26:43] You: Ok - so I won't include you in dinner?
+[29/10/2026, 18:26:51] Shane: No
+[29/10/2026, 22:40:37] Daddy: Your security code with Daddy changed.
+[01/11/2026, 00:28:18] Shane: Dublin Fire Brigade Halloween 2026
+https://goo.gl/maps/PMYWyJtk2wPDRsjh7?g_st=aw
+[01/11/2026, 12:15:00] Shane: <attached: photo_halloween.jpg>
+[01/11/2026, 16:58:39] You: Can ye get Weetabix please.`;
+
+        // DOM Elements
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInputHeader = document.getElementById('fileInputHeader');
+        const mediaReplacerInput = document.getElementById('mediaReplacerInput');
+        const uploadScreen = document.getElementById('uploadScreen');
+        const chatWindow = document.getElementById('chatWindow');
+        const chatTitle = document.getElementById('chatTitle');
+        const chatSubtitle = document.getElementById('chatSubtitle');
+        const searchBar = document.getElementById('searchBar');
+        const searchInput = document.getElementById('searchInput');
+        const senderFilter = document.getElementById('senderFilter');
+        const meSelect = document.getElementById('meSelect');
+        const scrollControls = document.getElementById('scrollControls');
+        const loadSampleBtn = document.getElementById('loadSampleBtn');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            setupEventListeners();
+            // Automatically pre-load sample chat matching the screenshot layout
+            processRawText(SAMPLE_CHAT, "_chat.txt");
+        });
+
+        function setupEventListeners() {
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.add('border-[#008069]', 'bg-emerald-100/50');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.remove('border-[#008069]', 'bg-emerald-100/50');
+                });
+            });
+
+            dropzone.addEventListener('click', () => fileInput.click());
+            dropzone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length) handleFile(files[0]);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) handleFile(e.target.files[0]);
+            });
+
+            fileInputHeader.addEventListener('change', (e) => {
+                if (e.target.files.length) handleFile(e.target.files[0]);
+            });
+
+            mediaReplacerInput.addEventListener('change', (e) => {
+                if (e.target.files.length && state.activeReplacingMsgId !== null) {
+                    const file = e.target.files[0];
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        state.customMediaMap[state.activeReplacingMsgId] = event.target.result;
+                        renderMessages();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            loadSampleBtn.addEventListener('click', () => {
+                processRawText(SAMPLE_CHAT, "_chat.txt");
+            });
+
+            document.getElementById('toggleSearchBtn').addEventListener('click', () => {
+                searchBar.classList.toggle('hidden');
+                if (!searchBar.classList.contains('hidden')) {
+                    searchInput.focus();
+                }
+            });
+
+            document.getElementById('closeSearchBtn').addEventListener('click', () => {
+                searchBar.classList.add('hidden');
+                state.searchTerm = '';
+                searchInput.value = '';
+                renderMessages();
+            });
+
+            searchInput.addEventListener('input', (e) => {
+                state.searchTerm = e.target.value.toLowerCase();
+                renderMessages();
+            });
+
+            senderFilter.addEventListener('change', (e) => {
+                state.filterSender = e.target.value;
+                renderMessages();
+            });
+
+            document.getElementById('toggleThemeBtn').addEventListener('click', toggleTheme);
+
+            const settingsModal = document.getElementById('settingsModal');
+            document.getElementById('toggleSettingsBtn').addEventListener('click', () => {
+                settingsModal.classList.remove('hidden');
+            });
+            document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+                settingsModal.classList.add('hidden');
+            });
+            document.getElementById('applySettingsBtn').addEventListener('click', () => {
+                state.currentUser = meSelect.value;
+                settingsModal.classList.add('hidden');
+                renderMessages();
+            });
+
+            const statsModal = document.getElementById('statsModal');
+            document.getElementById('toggleStatsBtn').addEventListener('click', () => {
+                updateStats();
+                statsModal.classList.remove('hidden');
+            });
+            document.getElementById('closeStatsBtn').addEventListener('click', () => {
+                statsModal.classList.add('hidden');
+            });
+
+            document.getElementById('scrollTopBtn').addEventListener('click', () => {
+                chatWindow.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            document.getElementById('scrollBottomBtn').addEventListener('click', () => {
+                chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'smooth' });
+            });
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            state.theme = isDark ? 'dark' : 'light';
+            const themeIcon = document.getElementById('themeIcon');
+            themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+            lucide.createIcons();
+        }
+
+        function handleFile(file) {
+            if (!file.name.endsWith('.txt')) {
+                alert('Please upload a valid WhatsApp export .txt file');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                processRawText(e.target.result, file.name);
+            };
+            reader.readAsText(file);
+        }
+
+        // Parse Date & Time string for badges/timestamps
+        function parseDateTime(timestampStr) {
+            if (!timestampStr) return { date: '', time: '' };
+            const parts = timestampStr.split(',');
+            if (parts.length >= 2) {
+                return { date: parts[0].trim(), time: parts.slice(1).join(',').trim() };
+            }
+            return { date: timestampStr, time: '' };
+        }
+
+        function populateSelectors(participants) {
+            senderFilter.innerHTML = '<option value="ALL">All Members</option>';
+            meSelect.innerHTML = '';
+
+            participants.forEach(name => {
+                const opt1 = document.createElement('option');
+                opt1.value = name;
+                opt1.textContent = name;
+                senderFilter.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = name;
+                opt2.textContent = name;
+                if (name === state.currentUser || name.toLowerCase() === 'you') {
+                    opt2.selected = true;
+                }
+                meSelect.appendChild(opt2);
+            });
+        }
+
+        function processRawText(rawText, fileName) {
+            state.rawText = rawText;
+            state.messages = [];
+            state.participants = new Set();
+            state.participantColors = {};
+            state.customMediaMap = {};
+
+            const lines = rawText.split(/\r?\n/);
+
+            // Comprehensive WhatsApp Date & Time regex triggers
+            const dateRegexes = [
+                /^\[(\d{1,4}[.\/-]\d{1,2}[.\/-]\d{1,4},\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)\]\s*(.*)$/i,
+                /^(\d{1,4}[.\/-]\d{1,2}[.\/-]\d{1,4},\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)\s*-\s*(.*)$/i
+            ];
+
+            let currentMsg = null;
+            let idCounter = 0;
+
+            lines.forEach((line) => {
+                if (!line.trim()) return;
+
+                let matched = false;
+                for (let r of dateRegexes) {
+                    const match = line.match(r);
+                    if (match) {
+                        if (currentMsg) state.messages.push(currentMsg);
+
+                        const dateTimeStr = match[1].trim();
+                        const content = match[2].trim();
+
+                        const colonIdx = content.indexOf(':');
+                        
+                        // Detect system messages
+                        const isSystemNotice = content.includes('security code') || 
+                                               content.includes('end-to-end encrypted') || 
+                                               content.includes('added') || 
+                                               content.includes('left') || 
+                                               content.includes('changed their phone number');
+
+                        if (colonIdx > -1 && !isSystemNotice) {
+                            const sender = content.substring(0, colonIdx).trim();
+                            const msgText = content.substring(colonIdx + 1).trim();
+
+                            state.participants.add(sender);
+                            currentMsg = {
+                                id: idCounter++,
+                                isSystem: false,
+                                timestamp: dateTimeStr,
+                                sender: sender,
+                                text: msgText
+                            };
+                        } else {
+                            currentMsg = {
+                                id: idCounter++,
+                                isSystem: true,
+                                timestamp: dateTimeStr,
+                                text: content
+                            };
+                        }
+                        matched = true;
+                        break;
+                    }
+                }
+
+                if (!matched) {
+                    if (currentMsg) {
+                        currentMsg.text += '\n' + line;
+                    } else {
+                        currentMsg = {
+                            id: idCounter++,
+                            isSystem: true,
+                            timestamp: '',
+                            text: line
+                        };
+                    }
+                }
+            });
+
+            if (currentMsg) state.messages.push(currentMsg);
+
+            const participantArray = Array.from(state.participants);
+            participantArray.forEach((name, idx) => {
+                state.participantColors[name] = NAME_COLORS[idx % NAME_COLORS.length];
+            });
+
+            // Auto-detect "You" if present, otherwise default to "You" or first member
+            const youMatch = participantArray.find(p => p.toLowerCase() === 'you');
+            state.currentUser = youMatch || 'You';
+            if (!participantArray.includes('You')) {
+                participantArray.unshift('You');
+            }
+
+            chatTitle.textContent = fileName.replace('.txt', '') || '_chat';
+            chatSubtitle.textContent = `${state.messages.length} messages • ${state.participants.size || 4} participants`;
+
+            populateSelectors(participantArray);
+
+            uploadScreen.classList.add('hidden');
+            chatWindow.classList.remove('hidden');
+            scrollControls.classList.remove('hidden');
+
+            renderMessages();
+
+            setTimeout(() => {
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }, 100);
+        }
+
+        // Helper: Check if string is media marker
+        function detectMedia(text) {
+            const attachedMatch = text.match(/<attached:\s*(.+?)>/i);
+            if (attachedMatch) {
+                return { type: 'attached', filename: attachedMatch[1] };
+            }
+            if (/<\s*Media omitted\s*>/i.test(text) || /<\s*file omitted\s*>/i.test(text)) {
+                return { type: 'omitted', filename: 'Media File' };
+            }
+            return null;
+        }
+
+        function renderMessages() {
+            chatWindow.innerHTML = '';
+
+            let lastDate = null;
+
+            const filtered = state.messages.filter(msg => {
+                if (state.filterSender !== 'ALL' && msg.sender !== state.filterSender && !msg.isSystem) {
+                    return false;
+                }
+                if (state.searchTerm) {
+                    const term = state.searchTerm;
+                    const textMatch = msg.text.toLowerCase().includes(term);
+                    const senderMatch = msg.sender && msg.sender.toLowerCase().includes(term);
+                    return textMatch || senderMatch;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                chatWindow.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-slate-400 py-12">
+                        <i data-lucide="message-square-off" class="w-8 h-8 mb-2 stroke-1"></i>
+                        <p class="text-xs font-medium">No messages found matching search criteria.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            filtered.forEach((msg) => {
+                const parsedDT = parseDateTime(msg.timestamp);
+
+                if (parsedDT.date && parsedDT.date !== lastDate) {
+                    lastDate = parsedDT.date;
+                    const dateBadge = document.createElement('div');
+                    dateBadge.className = 'flex justify-center my-3 sticky top-1 z-10';
+                    dateBadge.innerHTML = `
+                        <span class="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md text-slate-600 dark:text-slate-300 text-[11px] font-medium px-3 py-1 rounded-lg shadow-sm border border-slate-200/80 dark:border-slate-700/80 uppercase tracking-wider">
+                            ${parsedDT.date}
+                        </span>
+                    `;
+                    chatWindow.appendChild(dateBadge);
+                }
+
+                if (msg.isSystem) {
+                    const sysEl = document.createElement('div');
+                    sysEl.className = 'flex justify-center my-2 px-2';
+                    sysEl.innerHTML = `
+                        <div class="bg-[#ffeecd] dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-200/70 dark:border-amber-800/60 text-[11px] px-3 py-1 rounded-md text-center shadow-sm max-w-sm sm:max-w-md leading-snug">
+                            ${escapeHTML(msg.text)}
+                        </div>
+                    `;
+                    chatWindow.appendChild(sysEl);
+                    return;
+                }
+
+                const isOutgoing = msg.sender === state.currentUser || msg.sender.toLowerCase() === 'you';
+                const bubbleColor = state.participantColors[msg.sender] || '#00a884';
+                const mediaInfo = detectMedia(msg.text);
+
+                const msgEl = document.createElement('div');
+                msgEl.className = `flex flex-col my-1 ${isOutgoing ? 'items-end' : 'items-start'}`;
+
+                const bubbleBg = isOutgoing 
+                    ? 'bg-[#d9fdd3] dark:bg-wa-darkBubbleOut text-slate-900 dark:text-slate-100 bubble-out' 
+                    : 'bg-white dark:bg-wa-darkBubbleIn text-slate-900 dark:text-slate-100 bubble-in';
+
+                let contentHtml = '';
+
+                if (mediaInfo) {
+                    const userImage = state.customMediaMap[msg.id];
+                    if (userImage) {
+                        contentHtml = `
+                            <div class="rounded-lg overflow-hidden mb-1 max-w-xs">
+                                <img src="${userImage}" alt="Uploaded attachment" class="w-full h-auto max-h-60 object-cover rounded">
+                            </div>
+                        `;
+                    } else {
+                        contentHtml = `
+                            <div class="flex items-center space-x-3 bg-black/5 dark:bg-white/5 p-2 rounded-lg border border-black/5 dark:border-white/5 mb-1 min-w-[200px]">
+                                <div class="w-10 h-10 bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded flex items-center justify-center shrink-0">
+                                    <i data-lucide="image" class="w-5 h-5"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeHTML(mediaInfo.filename)}</p>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400">Media Omitted</p>
+                                </div>
+                                <button onclick="triggerUploadForMsg(${msg.id})" title="Click to upload image replacement" class="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded text-emerald-600 dark:text-emerald-400 transition">
+                                    <i data-lucide="upload" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+                } else {
+                    contentHtml = `
+                        <div class="text-[13px] sm:text-[14px] leading-relaxed break-words pb-3 pr-4">
+                            ${formatMessageText(msg.text)}
+                        </div>
+                    `;
+                }
+
+                msgEl.innerHTML = `
+                    <div class="relative min-w-[120px] max-w-[85%] sm:max-w-[70%] rounded-lg px-2.5 py-1.5 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] ${bubbleBg}">
+                        ${!isOutgoing ? `
+                            <div class="text-[12px] font-semibold leading-tight mb-0.5" style="color: ${bubbleColor}">
+                                ${escapeHTML(msg.sender)}
+                            </div>
+                        ` : ''}
+                        
+                        ${contentHtml}
+
+                        <div class="absolute bottom-1 right-2 flex items-center space-x-0.5 text-[10px] text-slate-500 dark:text-slate-400 select-none">
+                            <span>${parsedDT.time || ''}</span>
+                            ${isOutgoing ? `
+                                <i data-lucide="check-check" class="w-3.5 h-3.5 text-sky-500 inline-block ml-0.5"></i>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+
+                chatWindow.appendChild(msgEl);
+            });
+
+            lucide.createIcons();
+        }
+
+        window.triggerUploadForMsg = function(msgId) {
+            state.activeReplacingMsgId = msgId;
+            mediaReplacerInput.click();
+        };
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        function formatMessageText(text) {
+            let formatted = escapeHTML(text);
+
+            // Clickable links regex detector
+            const urlRegex = /(https?:\/\/[^\s<]+)/g;
+            formatted = formatted.replace(urlRegex, (url) => {
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline break-all">${url}</a>`;
+            });
+
+            formatted = formatted.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+            formatted = formatted.replace(/_(.*?)_/g, '<em>$1</em>');
+            formatted = formatted.replace(/~(.*?)~/g, '<del>$1</del>');
+            formatted = formatted.replace(/```(.*?)```/g, '<code class="bg-black/10 dark:bg-white/10 px-1 rounded font-mono text-xs">$1</code>');
+
+            return formatted.replace(/\n/g, '<br>');
+        }
+
+        function updateStats() {
+            const totalMsgs = state.messages.length;
+            const participantsCount = state.participants.size;
+
+            document.getElementById('statTotalMessages').textContent = totalMsgs;
+            document.getElementById('statTotalParticipants').textContent = participantsCount;
+
+            const counts = {};
+            state.messages.forEach(m => {
+                if (!m.isSystem && m.sender) {
+                    counts[m.sender] = (counts[m.sender] || 0) + 1;
+                }
+            });
+
+            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+            const listEl = document.getElementById('statParticipantsList');
+            listEl.innerHTML = '';
+
+            sorted.forEach(([name, count]) => {
+                const pct = totalMsgs ? Math.round((count / totalMsgs) * 100) : 0;
+                const color = state.participantColors[name] || '#00a884';
+
+                const row = document.createElement('div');
+                row.className = 'bg-slate-50 dark:bg-slate-700/40 p-2.5 rounded-lg border border-slate-100 dark:border-slate-700';
+                row.innerHTML = `
+                    <div class="flex justify-between items-center text-xs font-semibold mb-1">
+                        <span style="color: ${color}">${escapeHTML(name)}</span>
+                        <span class="text-slate-500 dark:text-slate-400">${count} (${pct}%)</span>
+                    </div>
+                    <div class="w-full bg-slate-200 dark:bg-slate-600 h-1.5 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full" style="width: ${pct}%; background-color: ${color}"></div>
+                    </div>
+                `;
+                listEl.appendChild(row);
+            });
+        }
+    </script>
+</body>
+</html>
